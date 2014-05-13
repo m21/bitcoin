@@ -600,12 +600,10 @@ private:
       // special case: if can't find the receiver -- assume sending to itself !
       // may also be true for BTC payments........
       // TODO: think about this..........
-/*
       if (receiver.empty())
       {
         receiver = sender;
       }
-*/
       if (receiver.empty()) ++InvalidCount_per_spec;
       if (!update_tally_map(sender, currency, - nValue)) break;
       update_tally_map(receiver, currency, nValue);
@@ -1092,7 +1090,8 @@ uint64_t txFee = 0;
           int mdata_count = 0;  // multisig data count
           if (!fMultisig)
           {
-          string strData;
+          string strScriptData;
+          string strDataAddress;
           unsigned char seq = 0xFF;
 
           // non-multisig data packets from this tx may be found here...
@@ -1118,33 +1117,38 @@ uint64_t txFee = 0;
   
                 if (("0000000000000001" == strSub) || ("0000000000000002" == strSub))
                 {
-                  if (strData.empty()) strData = script_data[k].substr(2*1,2*PACKET_SIZE_CLASS_A);
+                  if (strScriptData.empty())
+                  {
+                    strScriptData = script_data[k].substr(2*1,2*PACKET_SIZE_CLASS_A);
+                    strDataAddress = address_data[k];
+                  }
   
-                  if (msc_debug3) printf("strData #1:%s, seq = %x, value_data[%d]=%lu, marker_count= %d\n",
-                   strData.c_str(), seq, k, value_data[k], marker_count);
+                  if (msc_debug3) printf("strScriptData #1:%s, seq = %x, value_data[%d]=%lu, %s marker_count= %d\n",
+                   strScriptData.c_str(), seq, k, value_data[k], strDataAddress.c_str(), marker_count);
 
                   for (int exodus_idx=0;exodus_idx<marker_count;exodus_idx++)
                   {
                     if (msc_debug3) printf("%s(); ExodusValues[%d]=%lu\n", __FUNCTION__, exodus_idx, ExodusValues[exodus_idx]);
                     if (value_data[k] == ExodusValues[exodus_idx])
                     {
-                      if (msc_debug3) printf("strData(exodus_idx=%d) #2:%s, seq = %x\n", exodus_idx, strData.c_str(), seq);
-                      strData = script_data[k].substr(2,2*PACKET_SIZE_CLASS_A);
+                      if (msc_debug3) printf("strScriptData(exodus_idx=%d) #2:%s, seq = %x\n", exodus_idx, strScriptData.c_str(), seq);
+                      strScriptData = script_data[k].substr(2,2*PACKET_SIZE_CLASS_A);
+                      strDataAddress = address_data[k];
                       break;
                     }
                   }
-                  if (!strData.empty()) break;
+                  if (!strScriptData.empty()) break;
                 }
               }
             }
 
-            if (!strData.empty())
+            if (!strScriptData.empty())
             {
               ++seq;
               // look for reference using the seq #
               for (unsigned r = 0; r<script_data.size();r++)
               {
-                if ((address_data[r] != strData) && (address_data[r] != exodus))
+                if ((address_data[r] != strDataAddress) && (address_data[r] != exodus))
                 {
                   if (seq == ParseHex(script_data[r].substr(0,2))[0])
                   {
@@ -1168,7 +1172,7 @@ uint64_t txFee = 0;
 
                     // BUG HERE, FIXME
                     // strData is the script, not address !!!!!!!!!!!!!!!!!!!!
-                    if ((address_data[k] != strData) && (address_data[k] != exodus))
+                    if ((address_data[k] != strDataAddress) && (address_data[k] != exodus))
                     {
                       if (ExodusHighestValue == value_data[k])
                       {
@@ -1185,8 +1189,7 @@ uint64_t txFee = 0;
               }
             }
 
-            if (strData.empty() || strReference.empty())
-
+            if (strDataAddress.empty() || strReference.empty())
             {
             // this must be the BTC payment - validate (?)
             // TODO
@@ -1222,9 +1225,9 @@ uint64_t txFee = 0;
             else
             {
             // valid Class A packet almost ready
-              if (msc_debug3) printf("valid Class A:from=%s:to=%s:data=%s\n", strSender.c_str(), strReference.c_str(), strData.c_str());
+              if (msc_debug3) printf("valid Class A:from=%s:to=%s:data=%s\n", strSender.c_str(), strReference.c_str(), strScriptData.c_str());
               packet_size = PACKET_SIZE_CLASS_A;
-              memcpy(single_pkt, &ParseHex(strData)[0], packet_size);
+              memcpy(single_pkt, &ParseHex(strScriptData)[0], packet_size);
             }
           }
           else // if (fMultisig)
