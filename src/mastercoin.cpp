@@ -38,7 +38,7 @@ using namespace boost;
 using namespace boost::assign;
 using namespace json_spirit;
 
-const string exodus = "1EXoDusjGwvnjZUyKkxZ4UHEf77z6A5S4P";
+static const string exodus = "1EXoDusjGwvnjZUyKkxZ4UHEf77z6A5S4P";
 // const string exodusHash = "946cb2e08075bcbaf157e47bcb67eb2b2339d242";
 
 /*
@@ -417,7 +417,8 @@ const map<string, msc_tally>::iterator my_it = msc_tally_map.find(Address);
 }
 
 // TODO: when HardFail is true -- do not transfer any funds if only a partial transfer would succeed
-bool update_tally_map(string who, unsigned int which, int64_t amount, bool bReserved = false)
+// bSet will SET the amount into the address, instead of just updating it
+bool update_tally_map(string who, unsigned int which, int64_t amount, bool bReserved = false, bool bSet = false)
 {
 bool bReturn = true;
 
@@ -430,7 +431,7 @@ bool bReturn = true;
       if (my_it != msc_tally_map.end())
       {
         // element found -- update
-        if (!bReserved) bReturn = (my_it->second).msc_update_moneys(which, amount);
+        if (!bReserved) bReturn = (my_it->second).msc_update_moneys(which, amount, bSet);
         else bReturn = (my_it->second).msc_update_reserved(which, amount);
       }
       else
@@ -851,19 +852,42 @@ unsigned int how_many_erased = 0;
   return how_many_erased;
 }
 
+uint64_t calculate_devmsc(unsigned int nTime)
+{
+// taken mainly from msc_validate.py: def get_available_reward(height, c)
+uint64_t devmsc = 0;
+// spec constants:
+const uint64_t all_reward = 5631623576222;
+const double seconds_in_one_year = 31556926;
+const double seconds_passed = nTime - 1377993874; // exodus bootstrap deadline
+const double years = seconds_passed/seconds_in_one_year;
+const double part_available = 1 - pow(0.5, years); // do I need 'long double' ? powl()
+const double available_reward=all_reward * part_available;
+
+  devmsc = rounduint64(available_reward);
+  update_tally_map(exodus, MASTERCOIN_CURRENCY_MSC, - DEV_MSC_BLOCK_290629, false, true);
+  update_tally_map(exodus, MASTERCOIN_CURRENCY_MSC, devmsc);
+
+  return devmsc;
+}
+
 // called once per block
 // it performs cleanup and other functions
-int mastercoin_handler_block(int nBlockNow)
+int mastercoin_handler_block(int nBlockNow, unsigned int nTime)
 {
 // for every new received block must do:
 // 1) remove expired entries from the accept list (per spec accept entries are valid until their blocklimit expiration; because the customer can keep paying BTC for the offer in several installments)
 // 2) update the amount in the Exodus address
 unsigned int how_many_erased = 0;
+uint64_t devmsc = 0;
 
   how_many_erased = cleanup_expired_accepts(nBlockNow);
-
   if (how_many_erased) printf("%s(%d); erased %u accepts this block, line %d, file: %s\n",
    __FUNCTION__, how_many_erased, nBlockNow, __LINE__, __FILE__);
+
+  // calculate devmsc as of this block
+  printf("devmsc for block %d: %lu\n", nBlockNow, devmsc = calculate_devmsc(nTime));
+
 
   return 0;
 }
@@ -877,8 +901,9 @@ uint64_t nMax = 0;
 // class A: data & address storage -- combine them into a structure or something
 vector<string>script_data;
 vector<string>address_data;
-vector<uint64_t>value_data;
-uint64_t ExodusValues[MAX_BTC_OUTPUTS];
+// vector<uint64_t>value_data;
+vector<int64_t>value_data;
+int64_t ExodusValues[MAX_BTC_OUTPUTS];
 int64_t ExodusHighestValue = 0;
 string strReference;
 unsigned char single_pkt[MAX_PACKETS * PACKET_SIZE];
@@ -1082,7 +1107,7 @@ uint64_t txFee = 0;
                   strObfuscatedHash[j] = HexStr(vec_chars);
                   boost::to_upper(strObfuscatedHash[j]); // uppercase per spec
 
-                  if (msc_debug6) if (10>j) printf("%d: sha256 hex: %s\n", j, strObfuscatedHash[j].c_str());
+                  if (msc_debug6) if (5>j) printf("%d: sha256 hex: %s\n", j, strObfuscatedHash[j].c_str());
                   strcpy((char *)sha_input, strObfuscatedHash[j].c_str());
               }
 
@@ -1426,7 +1451,7 @@ int max_block = chainActive.Height();
 
     while (!txq.empty()) msc_tx_pop();
 
-    mastercoin_handler_block(blockNum);
+    mastercoin_handler_block(blockNum, (pblockindex->GetBlockHeader()).nTime);
   }
 
   for(map<string, msc_tally>::iterator my_it = msc_tally_map.begin(); my_it != msc_tally_map.end(); ++my_it)
@@ -1648,6 +1673,7 @@ int mastercoin_init()
   (void) msc_post_preseed(290630);  // the DEX block, using Zathras msc_balances_290629.txt , md5: f275c5a17bd2d36da8c686f2a4337e06
 
   // dump a few random addresses & balances
+  printf("balance: %lu\n", getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC));
   printf("balance: %lu\n", getMPbalance("13rpJ1r4onYA7RJfya3P8S3AaEqgXEkM8n", MASTERCOIN_CURRENCY_MSC));
   printf("balance: %lu\n", getMPbalance("1MnW3JgujMavTzBCiZyfxigDhu9pnDE7dU", MASTERCOIN_CURRENCY_MSC));
 

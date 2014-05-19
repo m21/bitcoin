@@ -9,6 +9,8 @@
 #include "netbase.h"
 #include "protocol.h"
 
+#define DEV_MSC_BLOCK_290629 (1743358325718)
+
 // Master Protocol Transaction (Packet) Version
 #define MP_TX_PKT_V0  0
 #define MP_TX_PKT_V1  1
@@ -62,12 +64,19 @@ private:
 
 public:
 
-  bool msc_update_moneys(unsigned char which, int64_t amount)  
+  // when bSet is true -- overwrite the amount in the address, not just adjust it (+/-)
+  bool msc_update_moneys(unsigned char which, int64_t amount, bool bSet = false)
   {
   LOCK(cs_tally);
 
     if (MSC_MAX_KNOWN_CURRENCIES > which)
     {
+      if (bSet)
+      {
+        moneys[which] = amount;
+        return true;
+      }
+
       // check here if enough money is available for this address prior to update !!!
       if (0>(moneys[which] + amount))
       {
