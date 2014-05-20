@@ -9,6 +9,7 @@
 #include "netbase.h"
 #include "protocol.h"
 
+// what should've been in the Exodus address for this block if none were spent
 #define DEV_MSC_BLOCK_290629 (1743358325718)
 
 // Master Protocol Transaction (Packet) Version

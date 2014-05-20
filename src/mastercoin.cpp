@@ -40,6 +40,8 @@ using namespace json_spirit;
 
 static const string exodus = "1EXoDusjGwvnjZUyKkxZ4UHEf77z6A5S4P";
 // const string exodusHash = "946cb2e08075bcbaf157e47bcb67eb2b2339d242";
+static uint64_t exodus_prev = DEV_MSC_BLOCK_290629;
+static uint64_t exodus_balance;
 
 /*
 int msc_debug0 = 0;
@@ -856,6 +858,7 @@ uint64_t calculate_devmsc(unsigned int nTime)
 {
 // taken mainly from msc_validate.py: def get_available_reward(height, c)
 uint64_t devmsc = 0;
+int64_t exodus_delta;
 // spec constants:
 const uint64_t all_reward = 5631623576222;
 const double seconds_in_one_year = 31556926;
@@ -865,8 +868,15 @@ const double part_available = 1 - pow(0.5, years); // do I need 'long double' ? 
 const double available_reward=all_reward * part_available;
 
   devmsc = rounduint64(available_reward);
-  update_tally_map(exodus, MASTERCOIN_CURRENCY_MSC, - DEV_MSC_BLOCK_290629, false, true);
-  update_tally_map(exodus, MASTERCOIN_CURRENCY_MSC, devmsc);
+  exodus_delta = devmsc - exodus_prev;
+
+  printf("devmsc=%lu, exodus_prev=%lu, exodus_delta=%ld\n", devmsc, exodus_prev, exodus_delta);
+
+  // per Zathras -- skip if a block's timestamp is older than that of a previous one!
+  if (0>exodus_delta) return 0;
+
+  update_tally_map(exodus, MASTERCOIN_CURRENCY_MSC, exodus_delta);
+  exodus_prev = devmsc;
 
   return devmsc;
 }
@@ -886,8 +896,7 @@ uint64_t devmsc = 0;
    __FUNCTION__, how_many_erased, nBlockNow, __LINE__, __FILE__);
 
   // calculate devmsc as of this block
-  printf("devmsc for block %d: %lu\n", nBlockNow, devmsc = calculate_devmsc(nTime));
-
+  printf("devmsc for block %d: %lu, Exodus balance: %lu\n", nBlockNow, devmsc = calculate_devmsc(nTime), getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC));
 
   return 0;
 }
@@ -951,7 +960,7 @@ uint64_t txFee = 0;
               return -1;
             }
 
-            printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+            printf("____________________________________________________________________________________________________________________________________\n");
             if (msc_debug3) printf("================BLOCK: %d======\ntxid: %s\n", nBlock, wtx.GetHash().GetHex().c_str());
 
             // now save output addresses & scripts for later use
@@ -1395,7 +1404,7 @@ Value mscrpc(const Array& params, bool fHelp)
           // my_it->first = key
           // my_it->second = value
 
-          printf("%34s : ", (my_it->first).c_str());
+          printf("%34s => ", (my_it->first).c_str());
           (my_it->second).print();
 
           ++count;
@@ -1459,7 +1468,7 @@ int max_block = chainActive.Height();
     // my_it->first = key
     // my_it->second = value
 
-    printf("%34s =>> ", (my_it->first).c_str());
+    printf("%34s => ", (my_it->first).c_str());
     (my_it->second).print();
   }
 
@@ -1670,12 +1679,18 @@ int mastercoin_init()
 //  (void) msc_post_preseed(292421);  // scan new blocks after the checkpoint above
 //  (void) msc_post_preseed(249497);  // Exodus block, dump for Zathras
 
+  // collect the real Exodus balances available at the snapshot time
+  exodus_balance = getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC);
+  printf("Exodus balance: %lu\n", exodus_balance);
+
   (void) msc_post_preseed(290630);  // the DEX block, using Zathras msc_balances_290629.txt , md5: f275c5a17bd2d36da8c686f2a4337e06
 
-  // dump a few random addresses & balances
-  printf("balance: %lu\n", getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC));
+  // dump few more random addresses & balances
   printf("balance: %lu\n", getMPbalance("13rpJ1r4onYA7RJfya3P8S3AaEqgXEkM8n", MASTERCOIN_CURRENCY_MSC));
   printf("balance: %lu\n", getMPbalance("1MnW3JgujMavTzBCiZyfxigDhu9pnDE7dU", MASTERCOIN_CURRENCY_MSC));
+
+  exodus_balance = getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC);
+  printf("Exodus balance: %lu\n", exodus_balance);
 
   return 0;
 }
