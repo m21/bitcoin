@@ -885,10 +885,13 @@ const double available_reward=all_reward * part_available;
 }
 
 // TODO: optimize efficiency -- iterate only over wallet's addresses in the future
-int get_wallet_totals()
+int set_wallet_totals()
 {
 int my_addresses_count = 0;
 const unsigned int currency = MASTERCOIN_CURRENCY_MSC;  // FIXME: hard-coded for MSC only, for PoC
+
+  global_MSC_total = 0;
+  global_MSC_RESERVED_total = 0;
 
   for(map<string, msc_tally>::iterator my_it = msc_tally_map.begin(); my_it != msc_tally_map.end(); ++my_it)
   {
@@ -924,11 +927,11 @@ uint64_t devmsc = 0;
   // calculate devmsc as of this block and update the Exodus' balance
   devmsc = calculate_and_update_devmsc(nTime);
 
-  printf("devmsc for block %d: %lu, Exodus balance: %lu\n", nBlockNow, devmsc, getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC));
+  printf("devmsc for block %d: %lu, Exodus balance: %lu\n", nBlockNow, devmsc, getMPbalance(exodus, MASTERCOIN_CURRENCY_MSC));
 
   // get the total MSC for this wallet, for QT display
-  global_MSC_total = 0;
-  global_MSC_RESERVED_total = 0;
+  (void) set_wallet_totals();
+  printf("the globals: MSC_total= %lu, MSC_RESERVED_total= %lu\n", global_MSC_total, global_MSC_RESERVED_total);
 
   return 0;
 }
@@ -1721,7 +1724,7 @@ int mastercoin_init()
   printf("balance: %lu\n", getMPbalance("13rpJ1r4onYA7RJfya3P8S3AaEqgXEkM8n", MASTERCOIN_CURRENCY_MSC));
   printf("balance: %lu\n", getMPbalance("1MnW3JgujMavTzBCiZyfxigDhu9pnDE7dU", MASTERCOIN_CURRENCY_MSC));
 
-  exodus_balance = getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC);
+  exodus_balance = getMPbalance(exodus, MASTERCOIN_CURRENCY_MSC);
   printf("Exodus balance: %lu\n", exodus_balance);
 
   return 0;
@@ -1769,12 +1772,12 @@ string msc_tally::getTMSC()
 // IsMine wrapper to determine whether the address is in our local wallet
 bool myAddress(const std::string &address) 
 {
-const CBitcoinAddress& mscaddress = address;
+  if (!pwalletMain) return false;
+
+  const CBitcoinAddress& mscaddress = address;
 
   CTxDestination lookupaddress = mscaddress.Get(); 
 
-  bool fMine = IsMine(*pwalletMain, lookupaddress);
-
-  return fMine;
+  return (IsMine(*pwalletMain, lookupaddress));
 }
 
