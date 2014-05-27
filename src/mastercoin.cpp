@@ -38,6 +38,9 @@ using namespace boost;
 using namespace boost::assign;
 using namespace json_spirit;
 
+uint64_t global_MSC_total = 0;
+uint64_t global_MSC_RESERVED_total = 0;
+
 static const string exodus = "1EXoDusjGwvnjZUyKkxZ4UHEf77z6A5S4P";
 // const string exodusHash = "946cb2e08075bcbaf157e47bcb67eb2b2339d242";
 static uint64_t exodus_prev = DEV_MSC_BLOCK_290629;
@@ -405,7 +408,7 @@ CCriticalSection cs_tally;
 map<string, msc_tally> msc_tally_map;
 
 // look at balance for an address
-uint64_t getMPbalance(const string &Address, unsigned int currency, bool bReserved = false)
+uint64_t getMPbalance(const string &Address, unsigned int currency, bool bReserved)
 {
 uint64_t balance = 0;
 const map<string, msc_tally>::iterator my_it = msc_tally_map.find(Address);
@@ -854,7 +857,7 @@ unsigned int how_many_erased = 0;
   return how_many_erased;
 }
 
-uint64_t calculate_devmsc(unsigned int nTime)
+uint64_t calculate_and_update_devmsc(unsigned int nTime)
 {
 // taken mainly from msc_validate.py: def get_available_reward(height, c)
 uint64_t devmsc = 0;
@@ -881,6 +884,29 @@ const double available_reward=all_reward * part_available;
   return devmsc;
 }
 
+// TODO: optimize efficiency -- iterate only over wallet's addresses in the future
+int get_wallet_totals()
+{
+int my_addresses_count = 0;
+const unsigned int currency = MASTERCOIN_CURRENCY_MSC;  // FIXME: hard-coded for MSC only, for PoC
+
+  for(map<string, msc_tally>::iterator my_it = msc_tally_map.begin(); my_it != msc_tally_map.end(); ++my_it)
+  {
+    // my_it->first = key
+    // my_it->second = value
+
+    if (myAddress(my_it->first))
+    {
+      ++my_addresses_count;
+
+      global_MSC_total += (my_it->second).getMoney(currency, false);
+      global_MSC_RESERVED_total += (my_it->second).getMoney(currency, true);
+    }
+  }
+
+  return (my_addresses_count);
+}
+
 // called once per block
 // it performs cleanup and other functions
 int mastercoin_handler_block(int nBlockNow, unsigned int nTime)
@@ -895,8 +921,14 @@ uint64_t devmsc = 0;
   if (how_many_erased) printf("%s(%d); erased %u accepts this block, line %d, file: %s\n",
    __FUNCTION__, how_many_erased, nBlockNow, __LINE__, __FILE__);
 
-  // calculate devmsc as of this block
-  printf("devmsc for block %d: %lu, Exodus balance: %lu\n", nBlockNow, devmsc = calculate_devmsc(nTime), getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC));
+  // calculate devmsc as of this block and update the Exodus' balance
+  devmsc = calculate_and_update_devmsc(nTime);
+
+  printf("devmsc for block %d: %lu, Exodus balance: %lu\n", nBlockNow, devmsc, getMPbalance(exodus.c_str(), MASTERCOIN_CURRENCY_MSC));
+
+  // get the total MSC for this wallet, for QT display
+  global_MSC_total = 0;
+  global_MSC_RESERVED_total = 0;
 
   return 0;
 }
@@ -1460,7 +1492,7 @@ int max_block = chainActive.Height();
 
     while (!txq.empty()) msc_tx_pop();
 
-    mastercoin_handler_block(blockNum, (pblockindex->GetBlockHeader()).nTime);
+    mastercoin_handler_block(blockNum, pblockindex->GetBlockTime());
   }
 
   for(map<string, msc_tally>::iterator my_it = msc_tally_map.begin(); my_it != msc_tally_map.end(); ++my_it)
@@ -1732,5 +1764,17 @@ string msc_tally::getTMSC()
 {
     // FIXME: negative numbers -- do they work here?
     return strprintf("%d.%08d", moneys[MASTERCOIN_CURRENCY_TMSC]/COIN, moneys[MASTERCOIN_CURRENCY_TMSC]%COIN);
+}
+
+// IsMine wrapper to determine whether the address is in our local wallet
+bool myAddress(const std::string &address) 
+{
+const CBitcoinAddress& mscaddress = address;
+
+  CTxDestination lookupaddress = mscaddress.Get(); 
+
+  bool fMine = IsMine(*pwalletMain, lookupaddress);
+
+  return fMine;
 }
 

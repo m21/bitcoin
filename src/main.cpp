@@ -1936,7 +1936,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew) {
         SyncWithWallets(tx.GetHash(), tx, &block);
         (void) mastercoin_handler_tx(tx, GetHeight(), tx_idx++);
     }
-    (void) mastercoin_handler_block(GetHeight(), (pindexNew->GetBlockHeader()).nTime);
+    (void) mastercoin_handler_block(GetHeight(), pindexNew->GetBlockTime());
     return true;
 }
 

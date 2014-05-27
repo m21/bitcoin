@@ -136,7 +136,7 @@ public:
   string getMSC();  // this function was created for QT only -- hard-coded internally, TODO: use getMoney()
   string getTMSC(); // this function was created for QT only -- hard-coded internally, TODO: use getMoney()
 
-  uint64_t getMoney(unsigned which_currency, bool bReserved) const
+  uint64_t getMoney(unsigned int which_currency, bool bReserved) const
   {
     if (MSC_MAX_KNOWN_CURRENCIES <= which_currency) return 0;
 
@@ -146,6 +146,11 @@ public:
 };
 
 extern map<string, msc_tally> msc_tally_map;
+extern uint64_t global_MSC_total;
+extern uint64_t global_MSC_RESERVED_total;
+
+uint64_t getMPbalance(const string &Address, unsigned int currency, bool bReserved = false);
+bool myAddress(const std::string &address);
 
 #endif
 
