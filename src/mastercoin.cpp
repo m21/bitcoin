@@ -1447,6 +1447,13 @@ Value mscrpc(const Array& params, bool fHelp)
 
   printf("%s(), line %d, file: %s\n", __FUNCTION__, __LINE__, __FILE__);
 
+// label tests
+
+  printf("label test: %s\n", getLabel("151TVVYVJseRg7RWC2WPpCMTAGvwPJrRLH").c_str());
+  printf("label test: %s\n", getLabel("1CJdoLYBbNoWC2NpL6fYc5JsSQVEVPu4oD").c_str());
+  printf("label test: %s\n", getLabel("1HLsY8fpmzxiz5mH9y2bFX8nddyNLsU8uA").c_str());
+  printf("label test: %s\n", getLabel("1H9eYMVGJ9cUt63Xh6qTStfHo5xWBbwNSw").c_str());
+
     return chainActive.Height();
 }
 
@@ -1779,5 +1786,23 @@ bool myAddress(const std::string &address)
   CTxDestination lookupaddress = mscaddress.Get(); 
 
   return (IsMine(*pwalletMain, lookupaddress));
+}
+
+string getLabel(const string &address)
+{
+CWallet *wallet = pwalletMain;
+
+  if (wallet)
+   {
+        LOCK(wallet->cs_wallet);
+        CBitcoinAddress address_parsed(address);
+        std::map<CTxDestination, CAddressBookData>::iterator mi = wallet->mapAddressBook.find(address_parsed.Get());
+        if (mi != wallet->mapAddressBook.end())
+        {
+            return (mi->second.name);
+        }
+    }
+
+  return string();
 }
 

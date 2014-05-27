@@ -152,5 +152,7 @@ extern uint64_t global_MSC_RESERVED_total;
 uint64_t getMPbalance(const string &Address, unsigned int currency, bool bReserved = false);
 bool myAddress(const std::string &address);
 
+string getLabel(const string &address);
+
 #endif
 
