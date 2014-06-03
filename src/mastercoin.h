@@ -62,6 +62,7 @@ class msc_tally
 private:
   int64_t moneys[MSC_MAX_KNOWN_CURRENCIES];
   int64_t reserved[MSC_MAX_KNOWN_CURRENCIES];
+	bool		divisible;	// mainly for human-interaction purposes; when divisible: multiply by COIN
 
 public:
 
@@ -117,6 +118,7 @@ public:
     {
       moneys[i] = 0;
       reserved[i] = 0;
+			divisible = true;
     }
 
     (void) msc_update_moneys(which, amount);
